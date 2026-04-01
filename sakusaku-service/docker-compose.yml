@@ -1,0 +1,111 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8083:8000"
+    volumes:
+      - .:/var/www/html
+      - ./storage:/var/www/html/storage
+    environment:
+      APP_ENV: local
+      APP_DEBUG: "true"
+      APP_KEY: "${APP_KEY}"
+      DB_CONNECTION: mysql
+      DB_HOST: host.docker.internal
+      DB_PORT: 3307
+      DB_DATABASE: sakusaku_post
+      DB_USERNAME: sakusakuuser
+      DB_PASSWORD: sakusaku_secret
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: difyai123456
+      REDIS_DB: 2
+      CACHE_STORE: redis
+      SESSION_DRIVER: redis
+      QUEUE_CONNECTION: redis
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - sakusaku-net
+      - dify-net
+    depends_on:
+      - node
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: php artisan queue:work redis --queue=default,images,notifications --sleep=3 --tries=3 --max-time=3600
+    volumes:
+      - .:/var/www/html
+    environment:
+      APP_ENV: local
+      APP_DEBUG: "true"
+      APP_KEY: "${APP_KEY}"
+      DB_CONNECTION: mysql
+      DB_HOST: host.docker.internal
+      DB_PORT: 3307
+      DB_DATABASE: sakusaku_post
+      DB_USERNAME: sakusakuuser
+      DB_PASSWORD: sakusaku_secret
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: difyai123456
+      REDIS_DB: 2
+      QUEUE_CONNECTION: redis
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - sakusaku-net
+      - dify-net
+    restart: unless-stopped
+
+  node:
+    image: node:20-alpine
+    working_dir: /var/www/html
+    ports:
+      - "5173:5173"
+    volumes:
+      - .:/var/www/html
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
+    networks:
+      - sakusaku-net
+
+  scheduler:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: sh -c "while true; do php artisan schedule:run --no-interaction; sleep 60; done"
+    volumes:
+      - .:/var/www/html
+    environment:
+      APP_ENV: local
+      APP_DEBUG: "true"
+      APP_KEY: "${APP_KEY}"
+      DB_CONNECTION: mysql
+      DB_HOST: host.docker.internal
+      DB_PORT: 3307
+      DB_DATABASE: sakusaku_post
+      DB_USERNAME: sakusakuuser
+      DB_PASSWORD: sakusaku_secret
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: difyai123456
+      REDIS_DB: 2
+      QUEUE_CONNECTION: redis
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - sakusaku-net
+      - dify-net
+    restart: unless-stopped
+
+networks:
+  sakusaku-net:
+    driver: bridge
+  dify-net:
+    external: true
+    name: docker_default

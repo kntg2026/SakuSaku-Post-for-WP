@@ -1,0 +1,19 @@
+# Laravel
+sakusaku-service/vendor/
+sakusaku-service/node_modules/
+sakusaku-service/.env
+sakusaku-service/storage/*.key
+sakusaku-service/storage/logs/
+sakusaku-service/storage/framework/cache/
+sakusaku-service/storage/framework/sessions/
+sakusaku-service/storage/framework/views/
+sakusaku-service/public/hot
+sakusaku-service/public/build/
+sakusaku-service/database/database.sqlite
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
