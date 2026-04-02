@@ -164,15 +164,19 @@ class ProcessDocSubmission implements ShouldQueue
                 }
             }
 
-            // 6. Update WP post with final HTML
-            if (!empty($processedImages)) {
-                Log::info("ProcessDoc [{$this->post->id}]: Updating WP post with final HTML");
-                $wpBridge->updatePost($wpResult['wp_post_id'], [
-                    'content' => $htmlContent,
-                ]);
+            // 6. Replace any remaining image placeholders with fallback text
+            $htmlContent = preg_replace(
+                '/<!-- sakusaku-image:\d+ -->/',
+                '<p><em>[画像を処理できませんでした]</em></p>',
+                $htmlContent
+            );
 
-                $this->post->update(['html_content' => $htmlContent]);
-            }
+            // Update WP post with final HTML
+            Log::info("ProcessDoc [{$this->post->id}]: Updating WP post with final HTML");
+            $wpBridge->updatePost($wpResult['wp_post_id'], [
+                'content' => $htmlContent,
+            ]);
+            $this->post->update(['html_content' => $htmlContent]);
 
             // 7. Set featured image
             if ($featuredAttachmentId) {
