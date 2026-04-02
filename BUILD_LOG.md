@@ -177,6 +177,29 @@ CRITICAL 1件、HIGH 4件、MEDIUM 5件、LOW 5件を検出。
 
 **対応不要（LOW 5件）:** 空ドキュメントバリデーション、config起動時検証、extractDocId URL対応拡張、ImageProcessingService例外処理、routes/web.phpルート順序コメント
 
+### 追加修正（MEDIUM 3件、2026-04-03）
+- ProcessDocSubmission: 画像プレースホルダーのフォールバック処理追加（未処理プレースホルダーを「[画像を処理できませんでした]」に置換）
+- GoogleDocsService: 全fetchメソッドにHttp::retry(2, 1000)追加
+- ProcessDocSubmission: リトライ回数をadmin_commentに表示（attempt N/3形式）
+
+### WPパーマリンク有効化（2026-04-03）
+- `.htaccess`にRewriteルール追加
+- WP DB `permalink_structure` を `/%postname%/` に変更
+- `/wp-json/sakusaku/v1/ping` 形式で動作確認済み
+- `?rest_route=` 形式も引き続き動作
+
 ### キューワーカー確認
 - ProcessDocSubmissionジョブがFAIL → テスト用偽Docs URL(`1TestDoc123`)でGoogle Docsアクセス404。期待通り。
 - Post status=failed, admin_comment記録済み → エラーハンドリング正常。
+
+### 全コミット履歴（8 commits on main）
+```
+15b6237 fix: Add HTTP retry to Google Docs API calls
+13fcea6 fix: Replace unprocessed image placeholders with fallback text
+58f329d fix: Improve job retry messaging and OAuth token refresh reliability
+35fb5da docs: Add Vite build, code audit results, and security fix details
+84ae673 fix: Security and error handling improvements from code audit
+5f145a9 fix: 4 bugs found during API testing (PHP 8.4, Guzzle, WP plugin, Docker)
+a0c2460 feat: Complete Steps 7-10 (Vue SPA, Admin, Tags, Billing)
+3b44f27 feat: Initial implementation Steps 1-7 (backend)
+```
