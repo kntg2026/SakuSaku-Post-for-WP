@@ -28,7 +28,7 @@ class GoogleDocsService
     private function fetchViaUrl(string $docId): string
     {
         $url = "https://docs.google.com/document/d/{$docId}/export?format=html";
-        $response = Http::timeout(30)->get($url);
+        $response = Http::retry(2, 1000)->timeout(30)->get($url);
 
         if (!$response->successful()) {
             throw new \RuntimeException("Failed to fetch doc via URL: HTTP {$response->status()}");
@@ -46,7 +46,7 @@ class GoogleDocsService
         $accessToken = $this->getValidOAuthToken($user);
         $url = "https://www.googleapis.com/drive/v3/files/{$docId}/export?mimeType=text/html";
 
-        $response = Http::timeout(30)
+        $response = Http::retry(2, 1000)->timeout(30)
             ->withToken($accessToken)
             ->get($url);
 
@@ -68,7 +68,7 @@ class GoogleDocsService
         $accessToken = $this->getServiceAccountToken($credentials);
         $url = "https://www.googleapis.com/drive/v3/files/{$docId}/export?mimeType=text/html";
 
-        $response = Http::timeout(30)
+        $response = Http::retry(2, 1000)->timeout(30)
             ->withToken($accessToken)
             ->get($url);
 
