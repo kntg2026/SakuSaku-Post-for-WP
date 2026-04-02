@@ -1,5 +1,11 @@
 <?php
 
+use App\Http\Controllers\Admin\CategoryManagementController;
+use App\Http\Controllers\Admin\DashboardController;
+use App\Http\Controllers\Admin\NotificationSettingsController;
+use App\Http\Controllers\Admin\PostManagementController;
+use App\Http\Controllers\Admin\TenantSettingsController;
+use App\Http\Controllers\Admin\UserManagementController;
 use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\PostController;
 use App\Http\Controllers\Auth\LogoutController;
@@ -37,11 +43,44 @@ Route::middleware(['auth:sanctum', 'resolve-tenant', 'tenant-active'])->group(fu
 
     // Admin API (Step 8)
     Route::prefix('admin')->middleware('admin-role')->group(function () {
-        // Will be populated in Step 8
+        Route::get('/dashboard', DashboardController::class);
+
+        // Post management
+        Route::get('/posts', [PostManagementController::class, 'index']);
+        Route::get('/posts/{post}', [PostManagementController::class, 'show']);
+        Route::post('/posts/{post}/approve', [PostManagementController::class, 'approve']);
+        Route::post('/posts/{post}/publish', [PostManagementController::class, 'publish']);
+        Route::post('/posts/{post}/reject', [PostManagementController::class, 'reject']);
+        Route::put('/posts/{post}/category', [PostManagementController::class, 'updateCategory']);
+        Route::delete('/posts/{post}', [PostManagementController::class, 'destroy']);
+
+        // User management
+        Route::get('/users', [UserManagementController::class, 'index']);
+        Route::put('/users/{user}/level', [UserManagementController::class, 'updateLevel']);
+        Route::put('/users/{user}/role', [UserManagementController::class, 'updateRole']);
+
+        // Category management
+        Route::get('/categories', [CategoryManagementController::class, 'index']);
+        Route::post('/categories', [CategoryManagementController::class, 'store']);
+        Route::put('/categories/{category}', [CategoryManagementController::class, 'update']);
+        Route::delete('/categories/{category}', [CategoryManagementController::class, 'destroy']);
+        Route::post('/categories/sync', [CategoryManagementController::class, 'syncFromWp']);
+
+        // Notification settings
+        Route::get('/notifications', [NotificationSettingsController::class, 'show']);
+        Route::put('/notifications', [NotificationSettingsController::class, 'update']);
+        Route::post('/notifications/test', [NotificationSettingsController::class, 'test']);
+
+        // Tenant settings
+        Route::get('/settings', [TenantSettingsController::class, 'show']);
+        Route::put('/settings', [TenantSettingsController::class, 'update']);
+        Route::post('/settings/test-wp', [TenantSettingsController::class, 'testWpConnection']);
     });
 
-    // Billing (Step 10)
+    // Billing
     Route::prefix('billing')->middleware('admin-role')->group(function () {
-        // Will be populated in Step 10
+        Route::get('/status', [\App\Http\Controllers\Billing\SubscriptionController::class, 'status']);
+        Route::post('/checkout', [\App\Http\Controllers\Billing\SubscriptionController::class, 'checkout']);
+        Route::post('/portal', [\App\Http\Controllers\Billing\SubscriptionController::class, 'portal']);
     });
 });

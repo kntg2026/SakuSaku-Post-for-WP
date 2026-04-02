@@ -9,7 +9,10 @@ Route::get('/auth/google/redirect', [GoogleAuthController::class, 'redirect'])
 Route::get('/auth/google/callback', [GoogleAuthController::class, 'callback'])
     ->name('auth.google.callback');
 
+// Stripe webhook (no auth, Stripe verifies via signature)
+Route::post('/stripe/webhook', [\App\Http\Controllers\Billing\WebhookController::class, 'handleWebhook']);
+
 // SPA catch-all (must be last)
 Route::get('/{any}', function () {
-    return view('welcome'); // Will be replaced with app.blade.php in Step 7
+    return view('app');
 })->where('any', '.*');

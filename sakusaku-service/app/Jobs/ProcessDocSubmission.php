@@ -8,7 +8,9 @@ use App\Models\PostImage;
 use App\Services\DocsHtmlConverter;
 use App\Services\GoogleDocsService;
 use App\Services\ImageProcessingService;
+use App\Services\NotificationService;
 use App\Services\ProcessedImage;
+use App\Services\TagGeneratorService;
 use App\Services\TenantContext;
 use App\Services\WpBridgeService;
 use Illuminate\Bus\Queueable;
@@ -34,6 +36,8 @@ class ProcessDocSubmission implements ShouldQueue
         DocsHtmlConverter $converter,
         ImageProcessingService $imageService,
         WpBridgeService $wpBridge,
+        TagGeneratorService $tagGenerator,
+        NotificationService $notifications,
     ): void {
         $tenantContext->set($this->post->tenant);
 
@@ -175,9 +179,36 @@ class ProcessDocSubmission implements ShouldQueue
                 $wpBridge->setFeaturedImage($wpResult['wp_post_id'], $featuredAttachmentId);
             }
 
-            // 8. Update status to draft
+            // 8. Generate tags via MeCab + TF-IDF
+            try {
+                Log::info("ProcessDoc [{$this->post->id}]: Generating tags");
+                $tags = $tagGenerator->generate($this->post);
+                // Sync tags to WP
+                foreach (array_keys($tags) as $tagName) {
+                    try {
+                        $wpBridge->createTag($tagName, $wpResult['wp_post_id']);
+                    } catch (\Throwable $e) {
+                        Log::warning("ProcessDoc [{$this->post->id}]: WP tag sync failed for '{$tagName}': {$e->getMessage()}");
+                    }
+                }
+            } catch (\Throwable $e) {
+                Log::warning("ProcessDoc [{$this->post->id}]: Tag generation failed: {$e->getMessage()}");
+            }
+
+            // 9. Update status to draft
             $this->post->update(['status' => PostStatus::Draft]);
             Log::info("ProcessDoc [{$this->post->id}]: Complete. WP post ID: {$wpResult['wp_post_id']}");
+
+            // 10. Send notification
+            try {
+                $notifications->send($this->post->tenant, 'on_submit', [
+                    'title' => $this->post->title,
+                    'poster' => $this->post->user->name,
+                    'category' => $this->post->category?->name ?? '—',
+                ]);
+            } catch (\Throwable $e) {
+                Log::warning("ProcessDoc [{$this->post->id}]: Notification failed: {$e->getMessage()}");
+            }
 
         } catch (\Throwable $e) {
             Log::error("ProcessDoc [{$this->post->id}]: Failed: {$e->getMessage()}");

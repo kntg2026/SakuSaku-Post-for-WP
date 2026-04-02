@@ -61,13 +61,44 @@
 - SubmitPostRequest: URL検証(regex)、カテゴリ存在確認、コメント文字数制限
 - PostResource/CategoryResource: APIレスポンス整形（リレーション含む）
 - 検証: GET /api/categories→3件、GET /api/posts→3件(pagination)、GET /api/posts/1→詳細JSON
-- **Vue SPAフロントエンドは未作成**（次セッションで実装）
+- Vue SPA作成完了: Login, Callback, Submit, MyPosts, PostDetail
+- Pinia stores: auth, posts, categories
+- useApi composable: Axiosラッパー+トークン自動付与+401ハンドリング
+- Vue Router: 認証ガード、admin権限ガード、SPAキャッチオール
+- レイアウト: PosterLayout（ナビ+ログアウト）、AdminLayout（インディゴナビ）
 
-## Step 8: 管理者ダッシュボード
-- 未着手
+## Step 8: 管理者ダッシュボード (完了 2026-04-02)
+- 6 APIコントローラ: Dashboard, PostManagement, UserManagement, CategoryManagement, NotificationSettings, TenantSettings
+- 22 adminルート登録済み
+- 7 Vue管理ページ: Dashboard, Posts, PostReview, Users, Categories, Notifications, Settings, Billing
+- 検証: GET /api/admin/dashboard→stats JSON, /admin/posts→3件, /admin/users→2件, /admin/settings→テナント設定
+- 検証: Poster→admin API→403（権限制御OK）
 
-## Step 9: タグ + 通知
-- 未着手
+## Step 9: タグ + 通知 (完了 2026-04-02)
+- MeCabTokenizer: proc_open経由でMeCab CLI呼び出し、名詞抽出（非自立/接尾/数/代名詞除外、2文字以上）
+- TfIdfCalculator: TF(augmented)×IDF、tag_corpusテーブルでテナント別DF管理
+- TagGeneratorService: テキスト→MeCab→TF-IDF→上位10件をpost_tagsに保存→corpus更新
+- NotificationService: Google Chat(Cards API) + Teams(Adaptive Cards)へのWebhook送信
+- ProcessDocSubmissionジョブにタグ生成(step 8)+通知(step 10)を組み込み
+- 検証: MeCab動作確認（美容室テキスト→14名詞抽出）、タグ生成確認（10タグ+スコア出力）
 
-## Step 10: 課金
-- 未着手
+## Step 10: 課金 (完了 2026-04-02)
+- SubscriptionController: status(現在のプラン・トライアル残日数)/checkout(Stripe Session作成)/portal
+- WebhookController: subscription.created/updated/deleted, invoice.payment_failed → テナントstatus自動更新
+- ProcessExpiredTrials artisanコマンド: 毎日実行、期限切れトライアルをsuspendに
+- config/sakusaku.php: Stripe Price ID、トライアル日数、画像設定、タグ設定の一元管理
+- routes/console.php: スケジューラ登録
+- routes/web.php: Stripe webhookエンドポイント（認証なし）、SPAキャッチオールをapp.blade.phpに切り替え
+- 検証: GET /api/billing/status→trial状態表示OK、POST /api/billing/checkout→Stripe未設定エラー正常、artisan expired-trials→0件suspended
+
+---
+
+## 全Step完了 (2026-04-02)
+
+### 残作業（Phase 1リリース前）
+- Google OAuthのGCPクライアントID/Secret設定
+- StripeのAPIキー + Price ID設定
+- Vite本番ビルド (`npm run build`)
+- 本番環境へのデプロイ設定（nginx reverse proxy等）
+- WPプラグインのパーマリンク設定（.htaccess）
+- E2Eテスト: Google Docsに記事作成→URL送信→WPに下書き→プレビュー→公開
