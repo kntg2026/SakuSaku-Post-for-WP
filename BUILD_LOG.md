@@ -148,3 +148,35 @@
 
 ### 修正後のCategoryManagementController::store()
 WPにカテゴリを先に作成してwp_category_idを取得し、updateOrCreateでLaravel側に保存する方式に変更。WP接続失敗時は502を返す（ローカルだけに中途半端に作らない）。
+
+---
+
+## Vite本番ビルド + コード監査 + セキュリティ修正 (2026-04-03)
+
+### Vite本番ビルド
+- `npm run build` 成功（469ms、23アセット出力）
+- 出力先: `public/build/` (gitignored、デプロイ時に都度ビルド)
+- 最大バンドル: runtime-core 55.75KB(gzip 21.91KB)、useApi 36.56KB(gzip 14.50KB)
+
+### コード監査（15件発見）
+CRITICAL 1件、HIGH 4件、MEDIUM 5件、LOW 5件を検出。
+
+**修正済み（CRITICAL+HIGH 3件）:**
+1. **WebhookController: Stripe署名検証なし（CRITICAL）** — `Stripe\Webhook::constructEvent()`による署名検証を追加。STRIPE_WEBHOOK_SECRET未設定時はローカル開発として検証スキップ。
+2. **PostManagementController::publish(): WP Bridge例外未捕捉（HIGH）** — try/catchで502レスポンスを返すよう修正。
+3. **EnsureTenantActive: テナント未解決時500→403（HIGH）** — セキュリティ的に適切なステータスコードに変更。
+
+**要対応（HIGH残り2件、MEDIUM 5件）:**
+- ProcessDocSubmission: リトライ時のステータス保持ロジック整理
+- GoogleDocsService: OAuthトークンリフレッシュのロギングとマージン
+- ProcessDocSubmission: 画像アップロード失敗時のHTML更新ロジック
+- ProcessDocSubmission: TagGenerator config値の明示的な受け渡し（現状はデフォルト値が一致しているため実害なし）
+- WebhookController: DB::transaction()ラップ
+- GoogleDocsService: Http::retry()の追加
+- EnsureTenantActive → PostManagementController: 明示的なテナント所有権検証（middleware依存で実害なし）
+
+**対応不要（LOW 5件）:** 空ドキュメントバリデーション、config起動時検証、extractDocId URL対応拡張、ImageProcessingService例外処理、routes/web.phpルート順序コメント
+
+### キューワーカー確認
+- ProcessDocSubmissionジョブがFAIL → テスト用偽Docs URL(`1TestDoc123`)でGoogle Docsアクセス404。期待通り。
+- Post status=failed, admin_comment記録済み → エラーハンドリング正常。
