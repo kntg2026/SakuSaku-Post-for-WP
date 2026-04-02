@@ -192,8 +192,20 @@ CRITICAL 1件、HIGH 4件、MEDIUM 5件、LOW 5件を検出。
 - ProcessDocSubmissionジョブがFAIL → テスト用偽Docs URL(`1TestDoc123`)でGoogle Docsアクセス404。期待通り。
 - Post status=failed, admin_comment記録済み → エラーハンドリング正常。
 
-### 全コミット履歴（8 commits on main）
+### 本番デプロイ準備（2026-04-03）
+- `docker/nginx.conf`: PHP-FPM + SPA routing + 静的アセットキャッシュ
+- `docker-compose.prod.yml`: nginx + php-fpm + worker + scheduler構成
+- `.env.example`: `SAKUSAKU_STRIPE_PRICE_ID`追加
+- Laravelキャッシュコマンド（config:cache, route:cache, view:cache）動作確認済み
+- スケジューラ（tenants:process-expired-trials）動作確認済み
+- 空ドキュメントバリデーション追加
+- ImageProcessingService: ファイル存在チェック追加
+
+### 全コミット履歴（11 commits on main）
 ```
+e8944e5 fix: Add empty doc validation and image file existence check
+c270c3b feat: Add production deployment config (nginx, docker-compose.prod.yml)
+e947430 docs: Final BUILD_LOG update with all fixes, audit results, permalink setup
 15b6237 fix: Add HTTP retry to Google Docs API calls
 13fcea6 fix: Replace unprocessed image placeholders with fallback text
 58f329d fix: Improve job retry messaging and OAuth token refresh reliability
