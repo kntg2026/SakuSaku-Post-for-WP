@@ -6,6 +6,7 @@ use App\Enums\DocsRetrievalMethod;
 use App\Models\Tenant;
 use App\Models\User;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class GoogleDocsService
 {
@@ -80,7 +81,9 @@ class GoogleDocsService
 
     private function getValidOAuthToken(User $user): string
     {
-        if ($user->google_token_expires_at && $user->google_token_expires_at->isFuture()) {
+        // 有効期限の5分前にリフレッシュ（ジョブ遅延によるギリギリ切れを防ぐ）
+        $margin = now()->addMinutes(5);
+        if ($user->google_token_expires_at && $user->google_token_expires_at->isAfter($margin)) {
             return $user->google_access_token;
         }
 
@@ -88,7 +91,9 @@ class GoogleDocsService
             throw new \RuntimeException('OAuth token expired and no refresh token available');
         }
 
-        $response = Http::asForm()->post('https://oauth2.googleapis.com/token', [
+        Log::info("GoogleDocs: Refreshing OAuth token for user {$user->id}");
+
+        $response = Http::retry(2, 1000)->asForm()->post('https://oauth2.googleapis.com/token', [
             'grant_type' => 'refresh_token',
             'client_id' => config('services.google.client_id'),
             'client_secret' => config('services.google.client_secret'),
@@ -96,7 +101,8 @@ class GoogleDocsService
         ]);
 
         if (!$response->successful()) {
-            throw new \RuntimeException('Failed to refresh OAuth token');
+            Log::error("GoogleDocs: Token refresh failed for user {$user->id}: HTTP {$response->status()}");
+            throw new \RuntimeException("Failed to refresh OAuth token: HTTP {$response->status()}");
         }
 
         $data = $response->json();
@@ -104,6 +110,8 @@ class GoogleDocsService
             'google_access_token' => $data['access_token'],
             'google_token_expires_at' => now()->addSeconds($data['expires_in'] ?? 3600),
         ]);
+
+        Log::info("GoogleDocs: Token refreshed for user {$user->id}, expires in {$data['expires_in']}s");
 
         return $data['access_token'];
     }

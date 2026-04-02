@@ -211,11 +211,19 @@ class ProcessDocSubmission implements ShouldQueue
             }
 
         } catch (\Throwable $e) {
-            Log::error("ProcessDoc [{$this->post->id}]: Failed: {$e->getMessage()}");
+            $attempt = $this->attempts();
+            $maxTries = $this->tries;
+            $isFinal = $attempt >= $maxTries;
+
+            Log::error("ProcessDoc [{$this->post->id}]: Failed (attempt {$attempt}/{$maxTries}): {$e->getMessage()}");
+
             $this->post->update([
                 'status' => PostStatus::Failed,
-                'admin_comment' => "Processing failed: {$e->getMessage()}",
+                'admin_comment' => $isFinal
+                    ? "Processing failed after {$attempt} attempts: {$e->getMessage()}"
+                    : "Processing failed (retry {$attempt}/{$maxTries}): {$e->getMessage()}",
             ]);
+
             throw $e;
         }
     }
