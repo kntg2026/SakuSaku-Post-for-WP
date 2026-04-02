@@ -105,6 +105,10 @@ class ImageProcessingService
 
     public function toBase64(string $filePath): string
     {
+        if (!file_exists($filePath)) {
+            throw new \RuntimeException("Image file not found: {$filePath}");
+        }
+
         return base64_encode(file_get_contents($filePath));
     }
 

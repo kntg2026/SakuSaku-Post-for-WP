@@ -48,6 +48,10 @@ class ProcessDocSubmission implements ShouldQueue
             Log::info("ProcessDoc [{$this->post->id}]: Fetching doc {$this->post->google_doc_id}");
             $docsResult = $docs->fetchDocument($this->post->google_doc_id, $this->post->user);
 
+            if (empty(trim($docsResult->html))) {
+                throw new \RuntimeException('Google Doc is empty');
+            }
+
             // 2. Convert HTML
             Log::info("ProcessDoc [{$this->post->id}]: Converting HTML");
             $conversionResult = $converter->convert($docsResult->html);
