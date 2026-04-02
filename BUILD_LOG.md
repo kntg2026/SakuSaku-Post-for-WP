@@ -102,3 +102,49 @@
 - 本番環境へのデプロイ設定（nginx reverse proxy等）
 - WPプラグインのパーマリンク設定（.htaccess）
 - E2Eテスト: Google Docsに記事作成→URL送信→WPに下書き→プレビュー→公開
+
+---
+
+## APIテスト + バグ修正 (2026-04-02)
+
+### テスト実施
+全33 APIエンドポイントを42回のHTTPコールでカバー。テスト対象:
+- 認証（admin/poster/無トークン）: 200/200/401
+- 投稿者API全GET: categories, posts, posts/{id} → 全200
+- 権限制御: poster→admin API→403、L1→publish→403
+- 管理者API全GET: dashboard, posts, users, categories, settings, notifications → 全200
+- 管理操作: approve(200), reject(200), updateLevel(200), updateCategory(200)
+- 投稿作成: POST /api/posts → 202
+- 投稿削除: DELETE /api/posts/{id} → 200
+- WP接続テスト: POST /admin/settings/test-wp → 200
+- WPカテゴリ同期: POST /admin/categories/sync → 200 (3件同期)
+- WPカテゴリ作成: POST /admin/categories → 201
+- 課金: billing/status → trial表示、billing/checkout → Stripe未設定503
+- バリデーション: rejected post→publish → 422、投稿ありカテゴリ削除 → 422
+- WP直接: ping → 200、投稿作成 → 201
+
+### 発見・修正したバグ 4件
+
+**Bug 1: Dockerネットワーク（データ修正）**
+テナントの`wp_site_url`が`http://localhost:8082`でDockerコンテナ内から到達不可。
+→ `http://host.docker.internal:8082`に変更。本番では実ドメインが入るため問題なし。
+
+**Bug 2: WPプラグイン `wp_insert_category()` 未定義（コード修正）**
+- ファイル: `sakusaku-post-bridge/includes/class-sakusaku-category-sync.php`
+- 原因: `wp_insert_category()`は`wp-admin/includes/taxonomy.php`にあるadmin専用関数。REST APIコンテキストでは自動ロードされない。
+- 修正: `wp_insert_term($name, 'category', $args)`に置換。term_exists時の既存ID返却も対応。
+- 関連修正: `class-sakusaku-api.php` のレスポンス形式を`['id' => $termId, 'term_id' => $termId]`に統一。
+
+**Bug 3: WpBridgeService Guzzle空配列バグ（コード修正）**
+- ファイル: `sakusaku-service/app/Services/WpBridgeService.php`
+- 原因: `Http::get($url, [])`でGuzzleが既存の`?rest_route=`クエリ文字列を上書き。WPのHTMLトップページが返り、JSON APIに到達しない。
+- 修正: `empty($data)`の場合は引数なしで`$client->$method($url)`を呼ぶ。
+- 影響: getCategories()で0件返却 → カテゴリ同期が常に0件だった。
+
+**Bug 4: PHP 8.3 + Laravel 13互換性（環境修正）**
+- ファイル: `sakusaku-service/Dockerfile`
+- 原因: `composer create-project`でLaravel 13.2.0がインストールされた（プラン時点ではLaravel 12想定）。Laravel 13はSymfony HttpFoundation 8.0に依存し、PHP 8.4の`request_parse_body()`を使用。PHP 8.3ではPUT/DELETEリクエストでFatal error。
+- 修正: Dockerfile `php:8.3-fpm` → `php:8.4-fpm`。イメージ再ビルド+コンテナ再起動。
+
+### 修正後のCategoryManagementController::store()
+WPにカテゴリを先に作成してwp_category_idを取得し、updateOrCreateでLaravel側に保存する方式に変更。WP接続失敗時は502を返す（ローカルだけに中途半端に作らない）。

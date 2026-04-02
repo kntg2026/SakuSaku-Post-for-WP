@@ -23,7 +23,7 @@ class CategoryManagementController extends Controller
         return CategoryResource::collection($categories);
     }
 
-    public function store(Request $request, TenantContext $tenantContext): JsonResponse
+    public function store(Request $request, TenantContext $tenantContext, WpBridgeService $wpBridge): JsonResponse
     {
         $request->validate([
             'name' => 'required|string|max:255',
@@ -32,14 +32,36 @@ class CategoryManagementController extends Controller
             'sort_order' => 'nullable|integer',
         ]);
 
-        $category = Category::create([
-            'tenant_id' => $tenantContext->id(),
-            'name' => $request->input('name'),
-            'slug' => $request->input('slug', \Str::slug($request->input('name'))),
-            'parent_id' => $request->input('parent_id'),
-            'sort_order' => $request->input('sort_order', 0),
-            'is_active' => true,
-        ]);
+        // Create category in WP first to get wp_category_id
+        try {
+            $wpResult = $wpBridge->createCategory($request->input('name'));
+            $wpCategoryId = $wpResult['id'] ?? $wpResult['term_id'] ?? null;
+        } catch (\Exception $e) {
+            return response()->json([
+                'error' => 'WordPress category creation failed',
+                'message' => $e->getMessage(),
+            ], 502);
+        }
+
+        if (!$wpCategoryId) {
+            return response()->json([
+                'error' => 'WordPress did not return a category ID',
+            ], 502);
+        }
+
+        $category = Category::updateOrCreate(
+            [
+                'tenant_id' => $tenantContext->id(),
+                'wp_category_id' => $wpCategoryId,
+            ],
+            [
+                'name' => $request->input('name'),
+                'slug' => $request->input('slug', \Str::slug($request->input('name'))),
+                'parent_id' => $request->input('parent_id'),
+                'sort_order' => $request->input('sort_order', 0),
+                'is_active' => true,
+            ]
+        );
 
         return response()->json(new CategoryResource($category), 201);
     }

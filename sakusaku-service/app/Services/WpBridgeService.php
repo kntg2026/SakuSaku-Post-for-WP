@@ -17,9 +17,14 @@ class WpBridgeService
         // Use ?rest_route= format for compatibility
         $url = "{$baseUrl}/?rest_route=/sakusaku/v1{$path}";
 
-        $response = Http::timeout(30)
-            ->withHeaders(['X-Sakusaku-Api-Key' => $tenant->wp_api_key])
-            ->$method($url, $data);
+        $client = Http::timeout(30)
+            ->withHeaders(['X-Sakusaku-Api-Key' => $tenant->wp_api_key]);
+
+        // GETリクエストで空配列を渡すとGuzzleが既存のクエリ文字列を上書きするため、
+        // データがない場合は引数なしで呼ぶ
+        $response = empty($data)
+            ? $client->$method($url)
+            : $client->$method($url, $data);
 
         if (!$response->successful()) {
             throw new \RuntimeException(

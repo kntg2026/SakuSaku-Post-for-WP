@@ -18,14 +18,19 @@ class Sakusaku_Category_Sync {
         return $result;
     }
 
-    public function create_category(string $name, int $parent = 0): int|WP_Error {
-        $result = wp_insert_category([
-            'cat_name'          => sanitize_text_field($name),
-            'category_parent'   => $parent,
-        ]);
+    public function create_category(string $name, int $parent = 0): array|WP_Error {
+        $args = [];
+        if ($parent > 0) {
+            $args['parent'] = $parent;
+        }
 
-        if (!$result) {
-            return new WP_Error('category_failed', 'Failed to create category');
+        $result = wp_insert_term(sanitize_text_field($name), 'category', $args);
+
+        if (is_wp_error($result)) {
+            if ($result->get_error_code() === 'term_exists') {
+                return ['term_id' => $result->get_error_data()];
+            }
+            return $result;
         }
 
         return $result;

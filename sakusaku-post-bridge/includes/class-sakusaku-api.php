@@ -206,7 +206,9 @@ class Sakusaku_Api {
             return $result;
         }
 
-        return new WP_REST_Response(['category_id' => $result], 201);
+        $termId = is_array($result) ? ($result['term_id'] ?? null) : $result;
+
+        return new WP_REST_Response(['id' => $termId, 'term_id' => $termId], 201);
     }
 
     // --- Tag endpoint ---
