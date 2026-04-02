@@ -92,7 +92,14 @@ class PostManagementController extends Controller
             return response()->json(['error' => 'WP post not created yet'], 422);
         }
 
-        $result = $wpBridge->publishPost($post->wp_post_id);
+        try {
+            $result = $wpBridge->publishPost($post->wp_post_id);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'error' => 'WordPress publish failed',
+                'message' => $e->getMessage(),
+            ], 502);
+        }
 
         $post->update([
             'status' => PostStatus::Published,

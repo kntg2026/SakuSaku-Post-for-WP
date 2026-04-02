@@ -14,7 +14,7 @@ class EnsureTenantActive
     public function handle(Request $request, Closure $next): Response
     {
         if (!$this->tenantContext->isResolved()) {
-            return response()->json(['error' => 'Tenant not resolved'], 500);
+            return response()->json(['error' => 'Tenant not resolved'], 403);
         }
 
         if (!$this->tenantContext->get()->isActive()) {

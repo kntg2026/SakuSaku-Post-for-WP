@@ -12,6 +12,27 @@ class WebhookController
 {
     public function handleWebhook(Request $request): Response
     {
+        // Stripe署名検証
+        $sigHeader = $request->header('stripe-signature');
+        $webhookSecret = config('services.stripe.webhook_secret');
+
+        if ($webhookSecret && $sigHeader) {
+            try {
+                \Stripe\Webhook::constructEvent(
+                    $request->getContent(),
+                    $sigHeader,
+                    $webhookSecret
+                );
+            } catch (\Stripe\Exception\SignatureVerificationException $e) {
+                Log::warning('Stripe webhook signature verification failed: ' . $e->getMessage());
+                return response('Invalid signature', 400);
+            }
+        } elseif ($webhookSecret && !$sigHeader) {
+            Log::warning('Stripe webhook received without signature header');
+            return response('Missing signature', 400);
+        }
+        // webhookSecretが未設定の場合はローカル開発環境として検証をスキップ
+
         $payload = $request->all();
         $type = $payload['type'] ?? '';
 
