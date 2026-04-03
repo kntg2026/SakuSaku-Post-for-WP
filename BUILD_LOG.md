@@ -201,8 +201,39 @@ CRITICAL 1件、HIGH 4件、MEDIUM 5件、LOW 5件を検出。
 - 空ドキュメントバリデーション追加
 - ImageProcessingService: ファイル存在チェック追加
 
-### 全コミット履歴（11 commits on main）
+### E2Eテスト + バグ修正 (2026-04-03 session 2)
+
+**GCP OAuth設定**
+- .envにGOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET設定（GCPコンソールで作成済み）
+- リダイレクトURI: http://localhost:8083/auth/google/callback
+
+**WPテーマ設定**
+- Astra + Elementor インストール・有効化
+- 要件#29（テーマ互換性）、#30（Docsテンプレート）、#31（UX/SEO課題）追加
+
+**E2Eテスト実施（19/19 PASS, 1 SKIP）**
+- 認証: 未認証拒否(401)、admin/posterトークン認証
+- 投稿: Docs URL送信→ジョブ実行→WP下書き→タグ生成→MyPosts一覧
+- 管理: ダッシュボード統計、投稿一覧、承認(draft→approved)、公開(→published)、却下(→rejected)
+- カテゴリ同期、WP接続テスト
+- 権限: poster→admin API 403
+- エラー: 無効URL 422、不存在カテゴリ 422
+
+**バグ修正3件**
+1. DocsHtmlConverter: span内のimgが走査されない（unwrap前にwalkNode）
+2. DocsHtmlConverter: タイトル抽出がH1のみ→H2/H3にも対応（Google DocsはH3を使う）
+3. ImageProcessingService: data URI(base64)画像対応 + Intervention Image v4 API対応
+   - HTML: 175KB(base64埋込) → 3.7KB(WP uploads URL) = 98%削減
+
+**スプレッドシート更新**
+- E2Eテストシート作成（手順書、全テスト結果記録）
+- テーマ互換テスト枠（20テーマ分）
+- 要件一覧: #29テーマ互換、#30テンプレート、#31 UX/SEO課題
+
+### 全コミット履歴（13 commits on main）
 ```
+94974aa fix: Handle base64 images from Google Docs, fix title extraction and Intervention Image v4 API
+2a9402e docs: Final session update — prod deploy prep, LOW fixes, full commit log
 e8944e5 fix: Add empty doc validation and image file existence check
 c270c3b feat: Add production deployment config (nginx, docker-compose.prod.yml)
 e947430 docs: Final BUILD_LOG update with all fixes, audit results, permalink setup
