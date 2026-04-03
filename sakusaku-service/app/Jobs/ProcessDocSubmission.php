@@ -65,6 +65,11 @@ class ProcessDocSubmission implements ShouldQueue
             // 3. Process images
             $processedImages = [];
             foreach ($conversionResult->images as $imgData) {
+                // For data URIs, don't store the full base64 in original_url
+                $originalUrl = str_starts_with($imgData['url'], 'data:')
+                    ? 'data:image (embedded in doc)'
+                    : $imgData['url'];
+
                 try {
                     Log::info("ProcessDoc [{$this->post->id}]: Processing image {$imgData['position']}");
                     $processed = $imageService->process(
@@ -76,7 +81,7 @@ class ProcessDocSubmission implements ShouldQueue
                     PostImage::create([
                         'post_id' => $this->post->id,
                         'tenant_id' => $this->post->tenant_id,
-                        'original_url' => $imgData['url'],
+                        'original_url' => $originalUrl,
                         'stored_path' => $processed->tempPath,
                         'width' => $processed->width,
                         'height' => $processed->height,
@@ -91,10 +96,10 @@ class ProcessDocSubmission implements ShouldQueue
                     PostImage::create([
                         'post_id' => $this->post->id,
                         'tenant_id' => $this->post->tenant_id,
-                        'original_url' => $imgData['url'],
+                        'original_url' => $originalUrl,
                         'sort_order' => $imgData['position'],
                         'status' => 'failed',
-                        'error_message' => $e->getMessage(),
+                        'error_message' => substr($e->getMessage(), 0, 500),
                     ]);
                 }
             }

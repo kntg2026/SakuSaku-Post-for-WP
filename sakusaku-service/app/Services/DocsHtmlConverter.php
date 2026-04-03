@@ -34,9 +34,10 @@ class DocsHtmlConverter
             return new ConversionResult('', '', []);
         }
 
-        $title = $this->extractTitle($body);
         $images = [];
+        // Walk first to extract images (including those inside title headings)
         $this->walkNode($body, $doc, $images);
+        $title = $this->extractTitle($body);
         $this->removeEmptyParagraphs($body);
 
         $html = '';
@@ -51,11 +52,21 @@ class DocsHtmlConverter
 
     private function extractTitle(\DOMElement $body): string
     {
-        $h1 = $body->getElementsByTagName('h1')->item(0);
-        if ($h1) {
-            $title = trim($h1->textContent);
-            $h1->parentNode->removeChild($h1);
-            return $title;
+        // Try H1 first, then H2, then H3 — Google Docs often uses H3 for titles
+        foreach (['h1', 'h2', 'h3'] as $tag) {
+            $el = $body->getElementsByTagName($tag)->item(0);
+            if ($el) {
+                $title = trim($el->textContent);
+                // Move any non-text children (e.g. image placeholders) to body before removing
+                $parent = $el->parentNode;
+                foreach (iterator_to_array($el->childNodes) as $child) {
+                    if ($child instanceof \DOMComment) {
+                        $parent->insertBefore($child, $el);
+                    }
+                }
+                $parent->removeChild($el);
+                return $title;
+            }
         }
         return '';
     }
@@ -91,7 +102,9 @@ class DocsHtmlConverter
                 $this->walkNode($new, $doc, $images);
                 return;
             }
-            // Unwrap plain spans
+            // Unwrap plain spans — walk children first before unwrapping,
+            // because unwrapNode moves children to parent and they won't be revisited
+            $this->walkNode($el, $doc, $images);
             $this->unwrapNode($el);
             return;
         }

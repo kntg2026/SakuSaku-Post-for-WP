@@ -18,18 +18,22 @@ class ImageProcessingService
 
     public function __construct()
     {
-        $this->manager = new ImageManager(new Driver());
+        $this->manager = new ImageManager(Driver::class);
     }
 
     public function process(string $imageUrl, int $tenantId, int $maxWidth = self::DEFAULT_MAX_WIDTH): ProcessedImage
     {
-        // Download
-        $response = Http::timeout(30)->get($imageUrl);
-        if (!$response->successful()) {
-            throw new \RuntimeException("Failed to download image: HTTP {$response->status()}");
+        // Handle data URI (base64-encoded images from Google Docs export)
+        if (str_starts_with($imageUrl, 'data:')) {
+            $data = $this->decodeDataUri($imageUrl);
+        } else {
+            $response = Http::timeout(30)->get($imageUrl);
+            if (!$response->successful()) {
+                throw new \RuntimeException("Failed to download image: HTTP {$response->status()}");
+            }
+            $data = $response->body();
         }
 
-        $data = $response->body();
         $size = strlen($data);
 
         if ($size > self::MAX_FILE_SIZE) {
@@ -45,7 +49,7 @@ class ImageProcessingService
         }
 
         // Process with Intervention Image
-        $image = $this->manager->read($data);
+        $image = $this->manager->decodeBinary($data);
         $width = $image->width();
         $height = $image->height();
 
@@ -58,12 +62,10 @@ class ImageProcessingService
 
         // Determine output format and encode
         $ext = $this->mimeToExtension($mime);
-        $encoded = match ($mime) {
-            'image/jpeg' => $image->toJpeg(85),
-            'image/png' => $image->toPng(),
-            'image/gif' => $image->toGif(),
-            'image/webp' => $image->toWebp(85),
-        };
+        $quality = in_array($mime, ['image/jpeg', 'image/webp']) ? 85 : null;
+        $encoded = $quality !== null
+            ? $image->encodeUsingMediaType($mime, quality: $quality)
+            : $image->encodeUsingMediaType($mime);
 
         $encodedData = (string) $encoded;
 
@@ -110,6 +112,21 @@ class ImageProcessingService
         }
 
         return base64_encode(file_get_contents($filePath));
+    }
+
+    private function decodeDataUri(string $dataUri): string
+    {
+        // Format: data:image/jpeg;base64,/9j/4AAQ...
+        if (!preg_match('#^data:([^;]+);base64,(.+)$#s', $dataUri, $matches)) {
+            throw new \RuntimeException('Invalid data URI format');
+        }
+
+        $data = base64_decode($matches[2], true);
+        if ($data === false) {
+            throw new \RuntimeException('Failed to decode base64 image data');
+        }
+
+        return $data;
     }
 
     private function mimeToExtension(string $mime): string
